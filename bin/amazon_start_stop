@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+
+require 'fog'
+require 'tzinfo'
+
+START_HOUR = 6 # Start 6AM
+STOP_HOUR  = 0 # Stop  0AM (midnight)
+
+conn = Fog::Compute::AWS.new(aws_access_key_id:     ENV['AWS_ACCESS_KEY_ID'],
+                             aws_secret_access_key: ENV['AWS_SECRET_ACCESS_KEY'])
+
+server = conn.servers.get(ENV['AWS_INSTANCE_ID'])
+
+puts "amazon_start_stop server #{server.id}"
+
+tz = TZInfo::Timezone.get('America/Sao_Paulo')
+
+# To get all zone identifiers by Country i.e. US, BR etc.
+# TZInfo::Country.get('BR').zone_identifiers.inspect
+
+now = tz.now
+
+puts "now #{now}"
+puts "start hour #{START_HOUR}"
+puts "stop hour #{STOP_HOUR}"
+
+stopped_range = (now.hour >= STOP_HOUR && now.hour < START_HOUR)
+running_range = !stopped_range
+
+if stopped_range && server.state != 'stopped'
+  puts "stopping server #{server.id}"
+
+  server.stop
+  # server.wait_for { state == 'stopped' }
+end
+
+if running_range && server.state != 'running'
+  puts "starting server #{server.id}"
+
+  server.start
+
+  if elastic_ip = ENV['AWS_ELASTIC_IP']
+    server.wait_for { state == 'running' }
+    puts "associating #{elastic_ip} to #{server.id}"
+    conn.associate_address server.id, elastic_ip
+    # conn.associate_address server.id, 127.0.0.0
+  end
+end
+
+puts "done #{server.id}"
+

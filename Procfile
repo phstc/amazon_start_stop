@@ -1,0 +1,1 @@
+amazon_start_stop: bundle exec ruby bin/amazon_start_stop
